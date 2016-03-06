@@ -1,0 +1,103 @@
+{
+  "variables": {
+    "aws_access_key_id": "{{env `AWS_ACCESS_KEY`}}",
+    "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+    "ssh_private_key_file": "{{env `SSH_PRIVATE_KEY_FILE`}}",
+    "cookbook_path": "{{env `CLOUD_DIR`}}/ops/devopracy-base/cookbooks",
+    "base_dir": "{{env `CLOUD_DIR`}}"
+  },
+  "builders": [{
+    "type": "amazon-ebs",
+    "access_key": "{{user `aws_access_key_id`}}",
+    "secret_key": "{{user `aws_secret_key`}}",
+    "region": "us-west-2",
+    "source_ami": "",
+    "instance_type": "t2.small",
+    "ssh_username": "fedora",
+    "ami_name": "fedora-base-{{isotime \"2006-01-02\"}}",
+    "ami_description": "fedora 21 devopracy base",
+    "security_group_ids": [ "" ],
+    "force_deregister": "true",
+    "ssh_keypair_name": "bootstrap",
+    "ssh_private_key_file": "{{user `ssh_private_key_file`}}",
+    "subnet_id": "",
+    "ami_users": [""],
+    "ami_block_device_mappings": [{
+      "delete_on_termination": "true",
+      "device_name": "/dev/sda1",
+      "volume_size": 30
+    }],
+    "launch_block_device_mappings": [{
+      "delete_on_termination": "true",
+      "device_name": "/dev/sda1",
+      "volume_size": 30
+    }], 
+    "tags": {
+      "stage": "dev",
+      "os": "fedora 21",
+      "release": "latest",
+      "role": "base",
+      "version": "0.0.1",
+      "lock": "none"
+    }
+  }],
+  "provisioners": [
+   {
+    "type": "shell",
+    "inline": [
+
+    ]
+   },
+   {
+    "type": "shell",
+    "script": "{{user `base_dir`}}/ops/devopracy-base/files/ext_disk.sh"
+   },
+   {
+    "type": "shell",
+    "inline": [
+      "sudo reboot",
+      "sleep 30",
+      "sudo resize2fs /dev/xvda1"
+   ]
+   },
+   {
+    "type": "shell",
+    "inline": [
+      "sudo mkdir -p /etc/chef && sudo chmod 777 /etc/chef",
+      "sudo mkdir -p /tmp/packer-chef-client && sudo chmod 777 /tmp/packer-chef-client"
+    ]
+   },
+   {
+    "type": "file",
+    "source": "{{user `cookbook_path`}}",
+    "destination": "/etc/chef/cookbooks"
+   },
+   {
+    "type": "chef-client",
+    "execute_command": "cd /etc/chef && sudo chef-client --local-mode -c /tmp/packer-chef-client/client.rb -j /tmp/packer-chef-client/first-boot.json",
+    "server_url": "http://localhost:8889",
+    "skip_clean_node": "true",
+    "skip_clean_client": "true",
+    "run_list": ["recipe[devopracy-base::default]"]
+   },
+   {
+    "type": "file",
+    "source": "{{user `base_dir`}}/ops/devopracy-base/test/spec",
+    "destination": "/home/fedora/spec/"
+   },
+   {
+    "type": "file",
+    "source": "{{user `base_dir`}}/ops/devopracy-base/test/Rakefile",
+    "destination": "/home/fedora/Rakefile"
+   },
+   {
+    "type": "shell",
+    "inline": ["/opt/chef/embedded/bin/rake spec"]
+   },
+   {
+    "type": "shell",
+    "inline": ["sudo chmod 600 /etc/chef"]
+   }
+  ]
+}
+
